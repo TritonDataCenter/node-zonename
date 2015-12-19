@@ -15,9 +15,6 @@ SRCS =	\
 CC =		/opt/local/bin/gcc
 CXX =		/opt/local/bin/g++
 
-#WARN_FLAGS +=	-Wno-error=unused-parameter
-
-#LDFLAGS +=	-L/usr/lib/fm -R/usr/lib/fm
 LIBS +=		-lumem
 
 include $(V8PLUS)/Makefile.v8plus.targ

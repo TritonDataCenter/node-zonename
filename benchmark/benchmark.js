@@ -10,7 +10,7 @@
  */
 
 var execFile = require('child_process').execFile;
-var zonename = require('../lib');
+var zonename = require('../lib').getzonename;
 
 var time;
 

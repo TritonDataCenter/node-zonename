@@ -8,35 +8,69 @@
  * Copyright 2015, Joyent, Inc.
  */
 
+#include <errno.h>
 #include <libnvpair.h>
+#include <string.h>
 #include <zone.h>
 
 #include "v8plus_glue.h"
 
-/*
- * Primary entrypoint from Javascript:
- */
 static nvlist_t *
-zonename_zonename(const nvlist_t *ap)
+zonename_getzoneid(const nvlist_t *ap __UNUSED)
 {
-	(void) ap;
+	zoneid_t zoneid = getzoneid();
+	return (v8plus_obj(V8PLUS_TYPE_NUMBER, "res", (double)zoneid,
+	    V8PLUS_TYPE_NONE));
+}
 
-	nvlist_t *ret = NULL;
-	zoneid_t zoneid;
+static nvlist_t *
+zonename_getzoneidbyname(const nvlist_t *ap)
+{
+	char *zonename;
+
+	if (v8plus_args(ap, V8PLUS_ARG_F_NOEXTRA,
+	    V8PLUS_TYPE_STRING, &zonename,
+	    V8PLUS_TYPE_NONE) != 0)
+		return (v8plus_error(V8PLUSERR_BADARG, "bad args"));
+
+	zoneid_t zoneid = getzoneidbyname(zonename);
+	if (zoneid < 0) {
+		char errbuf[128];
+
+		snprintf(errbuf, sizeof (errbuf),
+		    "getzoneidbyname: %s", strerror(errno));
+
+		return (v8plus_error(V8PLUSERR_UNKNOWN,
+		    errbuf));
+	}
+
+	return (v8plus_obj(V8PLUS_TYPE_NUMBER, "res", (double)zoneid,
+	    V8PLUS_TYPE_NONE));
+}
+
+static nvlist_t *
+zonename_getzonenamebyid(const nvlist_t *ap)
+{
+	double zoneid;
 	char zonename[ZONENAME_MAX];
 
-	if (nvlist_alloc(&ret, NV_UNIQUE_NAME, 0) != 0)
-		return (v8plus_error(V8PLUSERR_UNKNOWN, "nvlist_alloc"));
+	if (v8plus_args(ap, V8PLUS_ARG_F_NOEXTRA,
+	    V8PLUS_TYPE_NUMBER, &zoneid,
+	    V8PLUS_TYPE_NONE) != 0)
+		return (v8plus_error(V8PLUSERR_BADARG, "bad args"));
 
-	zoneid = getzoneid();
+	if (getzonenamebyid(zoneid, zonename, ZONENAME_MAX) < 0) {
+		char errbuf[128];
 
-	if (getzonenamebyid(zoneid, zonename, sizeof (zonename)) < 0)
-		return (v8plus_error(V8PLUSERR_UNKNOWN, "getzonenamebyid"));
+		snprintf(errbuf, sizeof (errbuf),
+		    "getzonenamebyid: %s", strerror(errno));
 
-	if (nvlist_add_string(ret, "res", zonename) != 0)
-		return (v8plus_error(V8PLUSERR_UNKNOWN, "nvlist_add_string"));
+		return (v8plus_error(V8PLUSERR_UNKNOWN,
+		    errbuf));
+	}
 
-	return ret;
+	return (v8plus_obj(V8PLUS_TYPE_STRING, "res", zonename,
+	    V8PLUS_TYPE_NONE));
 }
 
 /*
@@ -53,8 +87,16 @@ const uint_t v8plus_method_count =
 
 const v8plus_static_descr_t v8plus_static_methods[] = {
 	{
-		sd_name: "zonename",
-		sd_c_func: zonename_zonename
+		sd_name: "getzoneidbyname",
+		sd_c_func: zonename_getzoneidbyname
+	},
+	{
+		sd_name: "getzonenamebyid",
+		sd_c_func: zonename_getzonenamebyid
+	},
+	{
+		sd_name: "getzoneid",
+		sd_c_func: zonename_getzoneid
 	}
 };
 const uint_t v8plus_static_method_count =
